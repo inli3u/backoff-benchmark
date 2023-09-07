@@ -33,6 +33,28 @@ describe('exponentialBackoff()', () => {
     expect(backoff(1)).toBe(2_000);
     expect(backoff(5)).toBe(ceiling);
   });
+
+  test('jitterRandomize: once', () => {
+    const backoff = exponentialBackoff({
+      jitterPercent: 1,
+      jitterRandomize: 'once',
+    });
+
+    backoff(1);
+    backoff(2);
+    // expect random() to be called once
+  });
+
+  test('jitterRandomize: each', () => {
+    const backoff = exponentialBackoff({
+      jitterPercent: 1,
+      jitterRandomize: 'each',
+    });
+
+    backoff(1);
+    backoff(2);
+    // expect random() to be called twice
+  });
 });
 
 describe('retryWait()', () => {

@@ -1,7 +1,7 @@
-type RetryFn = (retries: number) => number;
-type WaitFn = (retries: number) => Promise<void>;
+export type RetryFn = (retries: number) => number;
+export type WaitFn = (retries: number) => Promise<void>;
 
-interface ExponentialBackoffOpts {
+export interface ExponentialBackoffOpts {
   base?: number;
   start?: number;
   ceiling?: number;
