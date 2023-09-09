@@ -42,7 +42,9 @@ describe('exponentialBackoff()', () => {
 
     backoff(1);
     backoff(2);
-    // expect random() to be called once
+
+    // TODO: expect Math.random() to be called once
+    expect(false).toBe(true);
   });
 
   test('jitterRandomize: each', () => {
@@ -53,7 +55,9 @@ describe('exponentialBackoff()', () => {
 
     backoff(1);
     backoff(2);
-    // expect random() to be called twice
+
+    // TODO: expect Math.random() to be called twice
+    expect(false).toBe(true);
   });
 });
 
