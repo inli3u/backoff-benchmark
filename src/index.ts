@@ -1,4 +1,4 @@
-export type RetryFn = (retries: number) => number;
+export type RetryFn = (retries: number, client?: number) => number;
 export type WaitFn = (retries: number) => Promise<void>;
 
 export interface ExponentialBackoffOpts {
@@ -12,6 +12,15 @@ export interface ExponentialBackoffOpts {
 
 type ExponentialBackoffFn = (opts: ExponentialBackoffOpts) => RetryFn;
 
+function mulberry32(a: number) {
+    return function() {
+      var t = a += 0x6D2B79F5;
+      t = Math.imul(t ^ t >>> 15, t | 1);
+      t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    }
+}
+
 /**
  * Builds and returns a backoff function.
  */
@@ -23,14 +32,31 @@ export const exponentialBackoff: ExponentialBackoffFn = ({
   jitterBias = 0.5,
   jitterRandomize = 'once',
 }) => {
-  let random = Math.random;
+  // let random = Math.random;
+  // let random = mulberry32(1);
+  // let random = mulberry32;
 
-  if (jitterRandomize === 'once') {
-    const n = Math.random();
-    random = () => n;
+  // if (jitterRandomize === 'once') {
+  //   const rand = mulberry32(Math.random());
+  //   random = () => n;
+  // }
+
+  const random = () => {
+    const rand = mulberry32(Math.random() * 1000);
+    const r = rand();
+    // console.log('Random:', r);
+    return r;
   }
 
-  return (retries) => {
+  const clientOffset = Math.random() * 1000;
+  const randomForClient = (client?: number) => {
+    const rand = mulberry32(client ?? 0 + clientOffset);
+    const r = rand();
+    // console.log('Random:', client, r);
+    return r;
+  }
+
+  return (retries, client) => {
     retries = Math.max(retries, 0);
 
     let wait = base ** retries * start;
@@ -38,7 +64,7 @@ export const exponentialBackoff: ExponentialBackoffFn = ({
 
     if (jitterPercent) {
       const amount = (wait - start) * jitterPercent;
-      wait += amount * random();
+      wait += amount * (jitterRandomize === 'once' ? randomForClient(client) : random());
     }
 
     return wait;

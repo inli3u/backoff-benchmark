@@ -6,7 +6,8 @@
   "scripts": {
     "build": "npx tsc",
     "typecheck": "npx tsc --noEmit --skipLibCheck",
-    "test": "npx tsc && npx jest"
+    "test": "npx tsc && npx jest",
+    "graph": "npx tsc && node ./build/graph.js"
   },
   "keywords": [],
   "author": "",
@@ -14,8 +15,9 @@
   "devDependencies": {
     "@types/jest": "^29.5.4",
     "@types/node": "^20.5.9",
-    "chartist-svg": "^0.2.8",
+    "asciichart": "^1.5.25",
     "jest": "^29.6.4",
+    "sample-distribution": "^1.8.0",
     "typescript": "^5.2.2"
   },
   "dependencies": {
