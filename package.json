@@ -7,7 +7,8 @@
     "build": "npx tsc",
     "typecheck": "npx tsc --noEmit --skipLibCheck",
     "test": "npx tsc && npx jest",
-    "graph": "npx tsc && node ./build/graph.js"
+    "graph": "npx tsc && node ./build/graph.js",
+    "simulation": "npx tsc && node ./build/simulation.js"
   },
   "keywords": [],
   "author": "",
@@ -21,6 +22,7 @@
     "typescript": "^5.2.2"
   },
   "dependencies": {
+    "@datastructures-js/priority-queue": "^6.3.0",
     "commander": "^11.0.0"
   }
 }

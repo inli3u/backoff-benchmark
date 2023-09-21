@@ -40,6 +40,21 @@ function run() {
 
   scenarios
     .map(runMonteCarlo({ sampleLimit: process.stdout.columns - 20 }))
+    // remove first two spikes
+    .map(result => ({ ...result, samples: result.samples.slice(Math.floor(4000 / result.bucketSize)) }))
+    // calculate requests
+    .map(result => ({ ...result, requests: result.samples.reduce((prev, cur) => prev + cur) }))
+    // calculate p values req/bucket
+    .map(result => {
+      const sorted = [...result.samples].sort((a, b) => a - b);
+      const dist = (p: number) => sorted[Math.round((sorted.length - 1) * p)];
+      return ({
+        ...result,
+        p95: dist(0.95),
+        p50: dist(0.5),
+        p5: dist(0.05),
+      });
+    })
     .map(renderAscii)
     .forEach(output);
 }
@@ -55,10 +70,13 @@ interface MonteCarloResult {
   maxTime: number;
   requests: number;
   bucketSize: number;
+  p95?: number;
+  p50?: number;
+  p5?: number;
   // dist: SampleDistributionRecorder;
 }
 
-function runMonteCarlo({ trials = 100, bucketSize = 300, sampleLimit = 160 }: MonteCarloOpts) {
+function runMonteCarlo({ trials = 1000, bucketSize = 500, sampleLimit = 160 }: MonteCarloOpts) {
   return (fn: RetryFn): MonteCarloResult => {
     const samples = new Map<number, number>();
     let maxTime = 0;
@@ -100,7 +118,7 @@ function renderAscii(result: MonteCarloResult) {
     height: 20,
   });
 
-  return `${plot}\nRequests: ${result.requests}`;
+  return `${plot}\nRequests: ${result.requests}\np95: ${result.p95}\np50: ${result.p50}\np5:  ${result.p5}`;
 }
 
 function output(plot: string, i: number) {

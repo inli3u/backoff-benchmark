@@ -48,13 +48,16 @@ describe('exponentialBackoff()', () => {
   });
 
   test('jitterRandomize: each', () => {
-    const backoff = exponentialBackoff({
+    const startRequest = exponentialBackoff({
       jitterPercent: 1,
       jitterRandomize: 'each',
     });
 
-    backoff(1);
-    backoff(2);
+    // const backoff = startRequest();
+    
+
+    // backoff(1);
+    // backoff(2);
 
     // TODO: expect Math.random() to be called twice
     expect(false).toBe(true);

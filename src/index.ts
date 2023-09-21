@@ -42,15 +42,17 @@ export const exponentialBackoff: ExponentialBackoffFn = ({
   // }
 
   const random = () => {
-    const rand = mulberry32(Math.random() * 1000);
-    const r = rand();
+    // const rand = mulberry32(Math.random() * 1000);
+    const rand = Math.random;
+    const r = rand() ;
     // console.log('Random:', r);
     return r;
   }
 
   const clientOffset = Math.random() * 1000;
   const randomForClient = (client?: number) => {
-    const rand = mulberry32(client ?? 0 + clientOffset);
+    // const rand = mulberry32(client ?? 0 + clientOffset);
+    const rand = Math.random;
     const r = rand();
     // console.log('Random:', client, r);
     return r;
@@ -63,8 +65,9 @@ export const exponentialBackoff: ExponentialBackoffFn = ({
     wait = Math.min(ceiling, wait);
 
     if (jitterPercent) {
-      const amount = (wait - start) * jitterPercent;
-      wait += amount * (jitterRandomize === 'once' ? randomForClient(client) : random());
+      const amount = wait * jitterPercent * (random() - jitterBias);
+      wait += amount;
+      // wait += amount * (jitterRandomize === 'once' ? randomForClient(client) : random());
     }
 
     return wait;
