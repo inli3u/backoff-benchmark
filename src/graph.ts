@@ -1,11 +1,5 @@
 const asciichart = require('asciichart');
-// const Recorder = require('sample-distribution');
 import { ExponentialBackoffOpts, RetryFn, exponentialBackoff } from ".";
-
-interface SampleDistributionRecorder {
-  push: (value: unknown) => void;
-  Q: (q: number) => number;
-}
 
 function run() {
   const baseOpts: ExponentialBackoffOpts = {
@@ -15,22 +9,22 @@ function run() {
   };
 
   const scenarios = [
-    exponentialBackoff({
+    () => exponentialBackoff({
       ...baseOpts,
       jitterPercent: 0.5,
       jitterBias: 0,
     }),
-    exponentialBackoff({
+    () => exponentialBackoff({
       ...baseOpts,
       jitterPercent: 1,
       jitterBias: 0,
     }),
-    exponentialBackoff({
+    () => exponentialBackoff({
       ...baseOpts,
       jitterPercent: 1,
       jitterBias: 1,
     }),
-    exponentialBackoff({
+    () => exponentialBackoff({
       ...baseOpts,
       jitterPercent: 1,
       jitterBias: 0,
@@ -41,7 +35,7 @@ function run() {
   scenarios
     .map(runMonteCarlo({ sampleLimit: process.stdout.columns - 20 }))
     // remove first two spikes
-    .map(result => ({ ...result, samples: result.samples.slice(Math.floor(4000 / result.bucketSize)) }))
+    // .map(result => ({ ...result, samples: result.samples.slice(Math.floor(4000 / result.bucketSize)) }))
     // calculate requests
     .map(result => ({ ...result, requests: result.samples.reduce((prev, cur) => prev + cur) }))
     // calculate p values req/bucket
@@ -77,13 +71,14 @@ interface MonteCarloResult {
 }
 
 function runMonteCarlo({ trials = 1000, bucketSize = 500, sampleLimit = 160 }: MonteCarloOpts) {
-  return (fn: RetryFn): MonteCarloResult => {
+  return (makeRetryFn: () => RetryFn): MonteCarloResult => {
     const samples = new Map<number, number>();
     let maxTime = 0;
     let maxBucket = 0;
     let requests = 0;
 
     for (let i = 0; i < trials; i++) {
+      const fn = makeRetryFn();
       let retries = 0;
       let time = 0;
       while (true) {

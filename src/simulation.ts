@@ -1,5 +1,5 @@
+const asciichart = require('asciichart');
 import { RetryFn, exponentialBackoff } from ".";
-
 import {
   PriorityQueue,
   MinPriorityQueue,
@@ -7,7 +7,6 @@ import {
   ICompare,
   IGetCompareValue,
 } from '@datastructures-js/priority-queue';
-
 
 
 interface Timeout {
@@ -27,7 +26,6 @@ class World {
 
   processQueue() {
     while (!this.queue.isEmpty()) {
-      // console.log('proceeQueue', this.queue.toArray());
       const { runAtTime, fn } = this.queue.dequeue();
       this.time = runAtTime;
       fn();
@@ -36,7 +34,6 @@ class World {
 
   setTimeout(delay: number, fn: () => void) {
     this.queue.enqueue({ runAtTime: this.now() + delay, fn });
-    // console.log('setTimeout', this.queue.toArray());
   }
 
   now(): number {
@@ -53,7 +50,60 @@ class World {
   }
 }
 
+function dist(values: number[], qlist: number[]): number[] {
+  if (!values.length) return [];
+
+  values = [...values].sort((a, b) => a - b);
+  return qlist.map((q) => {
+    const i = Math.floor((values.length - 1) * q);
+    if (i < 0 || i >= values.length) {
+      console.warn('dist(): index out of bounds');
+      return NaN;
+    }
+    return values[i];
+  });
+}
+
+class Sampler {
+  private samples = new Map<number, number>();
+  private minBucket = Number.MAX_VALUE;
+  private maxBucket = Number.MIN_VALUE;
+
+  constructor(private bucketSize: number) {
+
+  }
+
+  push(time: number, value: number) {
+    const bucket = Math.floor(time / this.bucketSize);
+    this.samples.set(bucket, (this.samples.get(bucket) ?? 0) + value);
+    this.minBucket = Math.min(this.minBucket, bucket);
+    this.maxBucket = Math.max(this.maxBucket, bucket);
+  }
+
+  collect(): number[] {
+    const values: number[] = [];
+    for (let bucket = this.minBucket; bucket <= this.maxBucket; bucket++) {
+      const n = this.samples.get(bucket);
+      if (!n) {
+        values.push(0);
+      } else {
+        values.push(n);
+      }
+    }
+    return values;
+  }
+
+  collectAndReset(): number[] {
+    const values = this.collect();
+    this.samples = new Map();
+    this.minBucket = Number.MAX_VALUE;
+    this.maxBucket = Number.MIN_VALUE;
+    return values;
+  }
+}
+
 const world = new World();
+// const sampler = new Sampler(1_000);
 
 
 
@@ -73,7 +123,6 @@ function limiter(limit: number) {
       windowCount = 0
       windowEnd = world.now() + 1000
     }
-    // console.log('limiter windowCount', windowCount);
 
     if (windowCount >= limit) {
       return true
@@ -91,7 +140,7 @@ class ServerWithRateLimit implements Server {
   private isRateLimited: () => boolean;
 
   constructor(
-    public rateLimit = 100
+    public rateLimit = 100,
   ) {
     this.requests = 0;
     this.failed = 0;
@@ -104,14 +153,10 @@ class ServerWithRateLimit implements Server {
 
     if (this.isRateLimited()) {
       this.failed++;
-      // console.log('requests', world.now(), this.requests, this.failed, this.succeeded);
       return false;
     }
 
     this.succeeded++;
-    // console.log('requests', world.now(), this.requests, this.failed, this.succeeded);
-    // addSample(bucket(now()));
-
     return true;
   }
 }
@@ -119,7 +164,7 @@ class ServerWithRateLimit implements Server {
 
 
 interface Client {
-  makeRequest(remoteFn: () => boolean): void;
+  makeRequest(sampler: Sampler, remoteFn: () => boolean): void;
 }
 
 class ClientWithBackoff implements Client{
@@ -129,13 +174,14 @@ class ClientWithBackoff implements Client{
 
   }
 
-  makeRequest(serverFn: () => boolean) {
+  makeRequest(sampler: Sampler, serverFn: () => boolean) {
     // Retry our simulated network request until it succeeds. Uses recursion instead of a loop because
     // our simulation of setTimeout() is not async.
     const backoffRequest = (retries: number) => {
       // This is our simulated network request.
       // console.log('client', retries);
       const success = serverFn();
+      sampler.push(world.now(), 1);
 
       if (success) {
         return;
@@ -158,62 +204,97 @@ class ClientWithBackoff implements Client{
 
 
 interface SimulationOpts {
-  requestCount: number;
+  requestCount?: number;
 }
 
-function prepareSim(opts: SimulationOpts, client: Client, server: Server) {
+function scenario(label: string, clients: Client[], server: Server, _opts: SimulationOpts = {}) {
   return () => {
+    const sampler = new Sampler(1_000);
+
     world.run(() => {
-      for (let i = 0; i < opts.requestCount; i++) {
-        client.makeRequest(server.handleRequest);
+      for (let client of clients) {
+        client.makeRequest(sampler, server.handleRequest);
       }
     });
-    console.log('test complete', world.now(), server.requests, server.failed, server.succeeded);
+
+    return {
+      label,
+      samples: sampler.collect(),
+      time: world.now(),
+      requests: server.requests,
+    };
   };
 }
 
+function make<T>(n: number, fn: () => T): T[] {
+  const list: T[] = [];
+  for (let i = 0; i < n; i++) {
+    list.push(fn());
+  }
+  return list;
+}
 
-
-const tests = [
-  // prepareTest(
-  //   { requestCount: 100 },
-  //   new ClientWithBackoff(exponentialBackoff({ jitterPercent: 0, jitterRandomize: 'each' })),
-  //   new ServerWithRateLimit(1),
-  // ),
-  prepareSim(
-    { requestCount: 1000 },
-    new ClientWithBackoff(exponentialBackoff({ jitterPercent: 0.5, jitterRandomize: 'each' })),
+const scenarios = [
+  scenario(
+    'Limit 10/s; half jitter; center bias',
+    make(1000, () => new ClientWithBackoff(exponentialBackoff({ jitterPercent: 0.5, jitterRandomize: 'each' }))),
     new ServerWithRateLimit(10),
   ),
-  prepareSim(
-    { requestCount: 1000 },
-    new ClientWithBackoff(exponentialBackoff({ jitterPercent: 1, jitterRandomize: 'each' })),
+  scenario(
+    'Limit 10/s; full jitter',
+    make(1000, () => new ClientWithBackoff(exponentialBackoff({ jitterPercent: 1, jitterBias: 0, jitterRandomize: 'each' }))),
     new ServerWithRateLimit(10),
   ),
-  // prepareTest(
-  //   { requestCount: 100 },
-  //   new ClientWithBackoff(exponentialBackoff({ jitterPercent: 0, jitterRandomize: 'each' })),
-  //   new ServerWithRateLimit(10),
-  // ),
-  prepareSim(
-    { requestCount: 1000 },
-    new ClientWithBackoff(exponentialBackoff({ jitterPercent: 0.5, jitterRandomize: 'each' })),
+  scenario(
+    'Limit 10/s; full jitter; fixed random',
+    make(1000, () => new ClientWithBackoff(exponentialBackoff({ jitterPercent: 1, jitterBias: 0, jitterRandomize: 'once' }))),
+    new ServerWithRateLimit(10),
+  ),
+
+  scenario(
+    'Limit 100/s; half jitter',
+    make(1000, () => new ClientWithBackoff(exponentialBackoff({ jitterPercent: 0.5, jitterRandomize: 'each' }))),
     new ServerWithRateLimit(100),
   ),
-  prepareSim(
-    { requestCount: 1000 },
-    new ClientWithBackoff(exponentialBackoff({ jitterPercent: 1, jitterRandomize: 'each' })),
+  scenario(
+    'Limit 100/s; full jitter; center bias',
+    make(1000, () => new ClientWithBackoff(exponentialBackoff({ jitterPercent: 1, jitterRandomize: 'each' }))),
+    new ServerWithRateLimit(100),
+  ),
+  scenario(
+    'Limit 100/s; full jitter',
+    make(1000, () => new ClientWithBackoff(exponentialBackoff({ jitterPercent: 1, jitterBias: 0, jitterRandomize: 'each' }))),
+    new ServerWithRateLimit(100),
+  ),
+  scenario(
+    'Limit 100/s; full jitter; fixed random',
+    make(1000, () => new ClientWithBackoff(exponentialBackoff({ jitterPercent: 1, jitterBias: 0, jitterRandomize: 'once' }))),
     new ServerWithRateLimit(100),
   ),
 ];
 
-// requests / rate limit
-// 10 / 1     === requests 29,222    37   27   10
-// 100 / 10   === requests 20,087   338  238  100
-// 1000 / 100 === requests 19,574  3344 2344 1000
+function fnum(n: number) {
+  const f = new Intl.NumberFormat();
+  return f.format(n);
+}
 
-// 100 / 1    === requests 318,947  682  582  100
-
-tests.forEach((test) => {
-  test();
-})
+scenarios
+  .map((fn) => fn())
+  .map((result) => ({
+    ...result,
+    dist: dist(result.samples, [0.95, 0.5, 0.05]),
+  }))
+  .forEach((result) => {
+    // const plot = asciichart.plot(result.samples, {
+    //   height: 20,
+    // });
+    
+    const lines = [
+      result.label,
+      `\tRequests: ${fnum(result.requests)}`,
+      `\tp95: ${fnum(result.dist[0])}`,
+      `\tp50: ${fnum(result.dist[1])}`,
+      `\tp5:  ${fnum(result.dist[2])}`,
+    ];
+    console.log(lines.join('\n') + '\n');
+  });
