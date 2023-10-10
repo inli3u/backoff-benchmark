@@ -20,12 +20,12 @@ export const exponentialBackoff: ExponentialBackoffFn = ({
   start = 1_000,
   ceiling = Number.POSITIVE_INFINITY,
   jitterPercent = 1,
-  jitterBias = 0.5,
+  jitterBias = 0,
   jitterRandomize = 'each',
 }) => {
-  const randomOnce = Math.random();
-  const random = () =>
-    (jitterRandomize === 'once' ? randomOnce : Math.random())
+  const randomizeOnce = (jitterRandomize === 'once') ? Math.random() : undefined;
+  const random = (): number =>
+    (randomizeOnce !== undefined) ? randomizeOnce : Math.random();
 
   return (retries, client) => {
     retries = Math.max(retries, 0);
@@ -34,8 +34,9 @@ export const exponentialBackoff: ExponentialBackoffFn = ({
     wait = Math.min(ceiling, wait);
 
     if (jitterPercent) {
-      const amount = wait * jitterPercent * (random() - jitterBias);
-      wait += amount;
+      const amount = wait * jitterPercent * random();
+      const bias = wait * jitterBias;
+      wait = wait - amount + bias;
     }
 
     return wait;

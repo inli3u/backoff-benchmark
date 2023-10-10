@@ -1,5 +1,5 @@
 const asciichart = require('asciichart');
-import { RetryFn, exponentialBackoff } from ".";
+import { RetryFn, exponentialBackoff } from "../src/backoff";
 import {
   PriorityQueue,
   MinPriorityQueue,

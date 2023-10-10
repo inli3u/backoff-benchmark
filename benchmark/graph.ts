@@ -1,5 +1,5 @@
 const asciichart = require('asciichart');
-import { ExponentialBackoffOpts, RetryFn, exponentialBackoff } from ".";
+import { ExponentialBackoffOpts, RetryFn, exponentialBackoff } from "../src/backoff";
 
 function run() {
   const baseOpts: ExponentialBackoffOpts = {

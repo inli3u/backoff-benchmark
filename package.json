@@ -5,22 +5,15 @@
   "main": "index.js",
   "scripts": {
     "build": "npx tsc",
-    "typecheck": "npx tsc --noEmit --skipLibCheck",
-    "test": "npx tsc && npx jest",
-    "graph": "npx tsc && node ./build/graph.js",
-    "simulation": "npx tsc && node ./build/simulation.js",
-    "sim": "./src/simulation.ts"
+    "typecheck": "npx tsc --noEmit --skipLibCheck"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@types/jest": "^29.5.4",
     "@types/node": "^20.5.9",
     "asciichart": "^1.5.25",
-    "jest": "^29.6.4",
-    "sample-distribution": "^1.8.0",
-    "typescript": "^5.2.2"
+    "bun-types": "^1.0.4-canary.20231003T140149"
   },
   "dependencies": {
     "@datastructures-js/priority-queue": "^6.3.0",
